@@ -22,3 +22,12 @@ Key decisions made during the Intake Triage Tool coding exercise.
 - **Export triggered via buttons on list and detail pages** — Simple anchor-style download; no client-side fetch or blob handling needed since the browser handles the `Content-Disposition: attachment` header natively.
 
 ## Adopting TweakCN Color Theme and Dashboard Layout Design
+
+## Dashboard Layout — Submitter View
+- **Navigation-focused shell with collapsible sidebar** — Adds persistent navigation (My Intakes, New Intake, Settings placeholder) to prepare for multiple user views without implementing user management yet.
+- **This is the project submitter's read-only surface** — The submitter can view their intakes and see approval status (Submitted, Approved, Denied) but cannot change it. Approval status changes will come from the analyst view (future work). The summary cards and badges are informational only, not actionable.
+- **Two-track status model** — `aiStatus` (pending/completed/error) tracks the AI triage pipeline; `approvalStatus` (submitted/approved/denied) tracks the business decision. These are deliberately separate concerns. The submitter sees approval status prominently and AI status as a secondary indicator.
+- **Summary cards double as filters** — The four status cards (Total, Submitted, Approved, Denied) show counts and act as click-to-filter controls. Client-side filtering on a single fetch — no extra API calls. Sufficient at current scale.
+- **Sidebar dark theme via CSS variables** — Sidebar colors are set to dark values directly in `:root` rather than using a `.dark` class wrapper. This avoids issues with Tailwind's `@custom-variant dark` selector which only targets descendants, not the element itself.
+- **No user management or route splitting yet** — Both views (submitter, analyst) will share the same routes for now. Route groups can be introduced when the analyst view is designed and user types are implemented.
+- **`approvalStatus` defaults to "submitted"** — Server-set, never user-submitted. Not added to `createIntakeSchema`. Only an analyst will be able to change this value (future feature).

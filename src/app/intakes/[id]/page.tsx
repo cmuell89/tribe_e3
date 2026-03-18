@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AiTriagePanel } from "@/components/ai-triage-panel";
+import { ApprovalBadge } from "@/components/approval-badge";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +24,9 @@ export default async function IntakeDetailPage({
   return (
     <div className="max-w-3xl mx-auto py-10 px-4">
       <div className="flex items-center justify-between mb-6">
-        <Link href="/" className="text-sm text-muted-foreground hover:underline">
-          &larr; Back to intakes
+        <Link href="/" className="text-sm text-muted-foreground hover:underline flex items-center gap-1">
+          <ArrowLeft className="h-3 w-3" />
+          Back to intakes
         </Link>
         <a href={`/api/intakes/${intake.id}/export`} download>
           <Button variant="outline" size="sm">
@@ -35,8 +37,9 @@ export default async function IntakeDetailPage({
       </div>
 
       <Card className="mb-6">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>{intake.title}</CardTitle>
+          <ApprovalBadge status={intake.approvalStatus} />
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">{intake.description}</p>

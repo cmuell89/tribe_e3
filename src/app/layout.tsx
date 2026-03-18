@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { Open_Sans, Source_Serif_4, IBM_Plex_Mono } from "next/font/google";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
 const fontSans = Open_Sans({
@@ -33,9 +36,19 @@ export default function RootLayout({
       <body
         className={`${fontSans.variable} ${fontSerif.variable} ${fontMono.variable} antialiased`}
       >
-        <main className="min-h-screen bg-background">
-          {children}
-        </main>
+        <TooltipProvider>
+          <SidebarProvider>
+            <AppSidebar />
+            <SidebarInset>
+              <header className="flex h-12 items-center gap-2 border-b px-4">
+                <SidebarTrigger className="-ml-1" />
+              </header>
+              <div className="flex-1 bg-background">
+                {children}
+              </div>
+            </SidebarInset>
+          </SidebarProvider>
+        </TooltipProvider>
       </body>
     </html>
   );
