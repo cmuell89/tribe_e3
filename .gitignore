@@ -16,6 +16,8 @@ dist/
 npm-debug.log*
 
 # prisma
+*.db
+*.db-journal
 prisma/*.db
 prisma/*.db-journal
 
@@ -26,3 +28,5 @@ prisma/*.db-journal
 # OS
 .DS_Store
 Thumbs.db
+
+/src/generated/prisma

@@ -1,0 +1,23 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Intake {
+  id                 String   @id @default(cuid())
+  title              String
+  description        String
+  budgetRange        String   @default("")
+  timeline           String   @default("")
+  industry           String   @default("")
+  createdAt          DateTime @default(now())
+  aiStatus           String   @default("pending")
+  aiSummary          String?
+  aiTags             String?
+  aiRiskChecklist    String?
+  aiValueProposition String?
+  aiError            String?
+}
