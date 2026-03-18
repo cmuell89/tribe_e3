@@ -23,8 +23,9 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy Prisma schema and migrations for runtime migrate deploy
+# Copy Prisma schema, migrations, and config for runtime migrate deploy
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 
 # Copy the entrypoint script
 COPY --from=builder /app/docker-entrypoint.sh ./docker-entrypoint.sh
@@ -33,8 +34,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Install only prisma CLI for migrations (npx prisma migrate deploy)
-RUN npm install --global prisma@$(node -e "console.log(require('./package.json').dependencies.prisma.replace('^',''))")
+# Install prisma CLI for migrations and dotenv for prisma.config.ts
+RUN npm install --global prisma@$(node -e "console.log(require('./package.json').dependencies.prisma.replace('^',''))") \
+    && npm install dotenv
 
 # Create data directory for SQLite and give nextjs user ownership
 RUN mkdir -p /app/data && chown nextjs:nodejs /app/data

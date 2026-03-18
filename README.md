@@ -34,12 +34,15 @@ Open **http://localhost:3001**.
 ### Docker alternative
 
 ```bash
-docker compose up --build    # runs on port 3001
+docker compose up --build    # first run (builds image with DATABASE_URL baked in)
+docker compose up            # subsequent runs (reuses existing image)
 docker compose down          # stop
 docker compose down -v       # stop + delete database
 ```
 
-Docker Compose reads `.env` automatically. The SQLite database is persisted in a named volume.
+Docker Compose reads `.env` automatically for the `ANTHROPIC_API_KEY`. The SQLite database is persisted in a named volume.
+
+> **Note:** If you change `DATABASE_URL` in `.env` or `docker-compose.yml`, you must rebuild the image with `docker compose up --build` so Prisma picks up the new value.
 
 ---
 
