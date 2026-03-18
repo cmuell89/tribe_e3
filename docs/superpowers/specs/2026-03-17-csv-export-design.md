@@ -58,9 +58,9 @@ Columns in order:
 
 A small module providing:
 
-- `escapeCSVField(value: string): string` — RFC 4180 compliant field escaping
-- `intakesToCSV(intakes: Intake[]): string` — converts array of intakes to full CSV string with header row
-- `intakeToCSV(intake: Intake): string` — convenience wrapper for single-intake export
+- `escapeCSVField(value: string | null | undefined): string` — RFC 4180 compliant field escaping; null/undefined returns empty string
+- `parseJSONArray(value: string | null | undefined): string` — parses a JSON array string into a comma-separated string; returns empty string on null or invalid input
+- `intakesToCSV(intakes: Intake[]): string` — converts array of intakes to full CSV string with header row (used for both bulk and single export via `intakesToCSV([intake])`)
 
 ## Frontend Changes
 
