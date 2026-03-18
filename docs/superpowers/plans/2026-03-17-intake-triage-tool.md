@@ -960,7 +960,7 @@ async function processAiTriage(
 }
 ```
 
-- [ ] **Step 2: Create the single intake route handler**
+- [ ] **Step 4: Create the single intake route handler**
 
 Write `src/app/api/intakes/[id]/route.ts`:
 
