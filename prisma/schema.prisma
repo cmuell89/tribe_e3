@@ -13,6 +13,7 @@ model Intake {
   budgetRange        String   @default("")
   timeline           String   @default("")
   industry           String   @default("")
+  approvalStatus     String   @default("submitted")
   createdAt          DateTime @default(now())
   aiStatus           String   @default("pending")
   aiSummary          String?

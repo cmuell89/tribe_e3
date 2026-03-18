@@ -26,3 +26,20 @@ export const triageOutputSchema = z.object({
 });
 
 export type TriageOutput = z.infer<typeof triageOutputSchema>;
+
+export const approvalStatusValues = ["submitted", "approved", "denied"] as const;
+export type ApprovalStatus = (typeof approvalStatusValues)[number];
+
+export const intakeResponseSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  budgetRange: z.string().optional(),
+  timeline: z.string().optional(),
+  industry: z.string().optional(),
+  approvalStatus: z.enum(approvalStatusValues),
+  aiStatus: z.string(),
+  createdAt: z.string(),
+});
+
+export type IntakeResponse = z.infer<typeof intakeResponseSchema>;

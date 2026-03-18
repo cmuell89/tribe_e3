@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { createIntakeSchema, triageOutputSchema } from "@/lib/schemas";
+import {
+  approvalStatusValues,
+  createIntakeSchema,
+  intakeResponseSchema,
+  triageOutputSchema,
+} from "@/lib/schemas";
 
 describe("createIntakeSchema", () => {
   it("accepts valid full input", () => {
@@ -53,6 +58,38 @@ describe("createIntakeSchema", () => {
   it("rejects missing title", () => {
     const result = createIntakeSchema.safeParse({
       description: "Valid description",
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("approvalStatusValues", () => {
+  it("contains exactly submitted, approved, denied", () => {
+    expect(approvalStatusValues).toEqual(["submitted", "approved", "denied"]);
+  });
+});
+
+describe("intakeResponseSchema", () => {
+  it("accepts valid intake response with approvalStatus", () => {
+    const result = intakeResponseSchema.safeParse({
+      id: "clx123",
+      title: "Test",
+      description: "Desc",
+      approvalStatus: "submitted",
+      aiStatus: "pending",
+      createdAt: "2026-03-17T00:00:00.000Z",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects invalid approvalStatus", () => {
+    const result = intakeResponseSchema.safeParse({
+      id: "clx123",
+      title: "Test",
+      description: "Desc",
+      approvalStatus: "invalid",
+      aiStatus: "pending",
+      createdAt: "2026-03-17T00:00:00.000Z",
     });
     expect(result.success).toBe(false);
   });
