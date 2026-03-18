@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AiTriagePanel } from "@/components/ai-triage-panel";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -20,10 +22,16 @@ export default async function IntakeDetailPage({
 
   return (
     <div className="max-w-3xl mx-auto py-10 px-4">
-      <div className="mb-6">
+      <div className="flex items-center justify-between mb-6">
         <Link href="/" className="text-sm text-muted-foreground hover:underline">
           &larr; Back to intakes
         </Link>
+        <a href={`/api/intakes/${intake.id}/export`} download>
+          <Button variant="outline" size="sm">
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+        </a>
       </div>
 
       <Card className="mb-6">
