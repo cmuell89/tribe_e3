@@ -26,9 +26,8 @@ function buildPrompt(intake: IntakeFields): string {
 }
 
 function isRetryable(error: unknown): boolean {
-  if (error && typeof error === "object" && "status" in error) {
-    const status = (error as { status: number }).status;
-    return status >= 500 || status === 429;
+  if (error instanceof Anthropic.APIError) {
+    return error.status >= 500 || error.status === 429;
   }
   if (error instanceof Error && error.message.includes("fetch")) {
     return true;

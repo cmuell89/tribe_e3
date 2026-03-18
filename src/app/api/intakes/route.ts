@@ -37,7 +37,9 @@ export async function POST(request: Request) {
   });
 
   // Fire-and-forget: do NOT await this
-  processAiTriage(intake.id, parsed.data);
+  processAiTriage(intake.id, parsed.data).catch((err) => {
+    console.error("Unhandled error in AI triage processing:", err);
+  });
 
   return NextResponse.json(intake, { status: 201 });
 }

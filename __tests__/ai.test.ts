@@ -15,6 +15,7 @@ vi.mock("@anthropic-ai/sdk", () => {
 
   class MockAnthropic {
     messages = { parse: mockParse };
+    static APIError = APIError;
   }
 
   return {

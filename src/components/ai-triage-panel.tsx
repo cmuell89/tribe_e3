@@ -15,6 +15,16 @@ interface Intake {
   aiError: string | null;
 }
 
+function safeParseArray(json: string | null): string[] {
+  if (!json) return [];
+  try {
+    const parsed = JSON.parse(json);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 export function AiTriagePanel({ intake: initial }: { intake: Intake }) {
   const [intake, setIntake] = useState(initial);
   const [timedOut, setTimedOut] = useState(false);
@@ -90,9 +100,8 @@ export function AiTriagePanel({ intake: initial }: { intake: Intake }) {
             <div>
               <h3 className="text-sm font-semibold mb-2">Tags</h3>
               <div className="flex gap-2 flex-wrap">
-                {intake.aiTags &&
-                  (JSON.parse(intake.aiTags) as string[]).map((tag) => (
-                    <Badge key={tag} variant="secondary">
+                {safeParseArray(intake.aiTags).map((tag, i) => (
+                    <Badge key={`tag-${i}`} variant="secondary">
                       {tag}
                     </Badge>
                   ))}
@@ -102,9 +111,8 @@ export function AiTriagePanel({ intake: initial }: { intake: Intake }) {
             <div>
               <h3 className="text-sm font-semibold mb-1">Risk Checklist</h3>
               <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                {intake.aiRiskChecklist &&
-                  (JSON.parse(intake.aiRiskChecklist) as string[]).map(
-                    (risk) => <li key={risk}>{risk}</li>
+                {safeParseArray(intake.aiRiskChecklist).map(
+                    (risk, i) => <li key={`risk-${i}`}>{risk}</li>
                   )}
               </ul>
             </div>
