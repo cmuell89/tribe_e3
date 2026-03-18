@@ -44,7 +44,7 @@ Single `Intake` table:
 
 ### POST `/api/intakes` Flow
 
-1. Validate required fields (title, description)
+1. Validate required fields (title, description). Budget range, timeline, and industry are optional.
 2. Create intake in DB with `aiStatus: "pending"`
 3. Return the intake immediately (201 Created)
 4. In a detached async function (no `await`):
