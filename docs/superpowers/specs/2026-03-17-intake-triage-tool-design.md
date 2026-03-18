@@ -78,10 +78,27 @@ Single `Intake` table:
 
 ## AI Integration
 
+### Structured Output
+
+Use the Anthropic SDK's structured output feature to guarantee a valid, typed JSON response. Define a Zod schema on the client side and pass it via the SDK — Claude will conform its output to the schema.
+
+**Zod schema:**
+
+```typescript
+const TriageSchema = z.object({
+  summary: z.string().describe("2-3 sentence summary of the project intake"),
+  tags: z.array(z.string()).length(3).describe("Exactly 3 relevant tags"),
+  riskChecklist: z.array(z.string()).min(3).max(5).describe("3-5 risk items"),
+  valueProposition: z.string().describe("2-3 sentences evaluating value relative to budget, timeline, and industry"),
+});
+```
+
+This eliminates the need for manual JSON parsing and makes JSON parse failures a non-issue for retries.
+
 ### Prompt
 
 ```
-System: You are a project intake triage assistant. Analyze the project request and return JSON.
+System: You are a project intake triage assistant. Analyze the project request and produce a triage analysis.
 
 User: Analyze this project intake:
 - Title: {title}
@@ -89,12 +106,6 @@ User: Analyze this project intake:
 - Budget: {budgetRange}
 - Timeline: {timeline}
 - Industry: {industry}
-
-Return JSON with:
-- summary (2-3 sentences)
-- tags (array of exactly 3 strings)
-- riskChecklist (array of 3-5 risk items as strings)
-- valueProposition (2-3 sentences evaluating the value relative to budget, timeline, and industry context)
 ```
 
 ### Model
@@ -112,7 +123,6 @@ Claude Sonnet — fast, cost-effective, capable of structured output.
 Retries on:
 - Network errors / timeouts
 - Claude API 5xx errors
-- JSON parse failures
 
 After 3 failures: set `aiStatus: "error"`, store last error message in `aiError`.
 
