@@ -756,6 +756,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { ClientDashboard } from "@/components/client-dashboard";
+import { Download } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -782,9 +783,17 @@ export default async function HomePage() {
             Your submitted project requests
           </p>
         </div>
-        <Link href="/intakes/new">
-          <Button>+ New Intake</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <a href="/api/intakes/export" download>
+            <Button variant="outline">
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+          </a>
+          <Link href="/intakes/new">
+            <Button>+ New Intake</Button>
+          </Link>
+        </div>
       </div>
 
       <ClientDashboard intakes={serializedIntakes} />
@@ -826,13 +835,15 @@ In `src/app/intakes/[id]/page.tsx`, make these changes:
 import { ApprovalBadge } from "@/components/approval-badge";
 ```
 
-2. Remove the "Back to intakes" link block (lines 23-27):
+2. Replace the top section that contains the "Back to intakes" link and "Export CSV" button. Remove the back link (sidebar provides navigation) but **preserve the Export CSV button**. Replace the `<div className="flex items-center justify-between mb-6">...</div>` block with just the Export CSV button:
 ```tsx
-// DELETE this block:
-      <div className="mb-6">
-        <Link href="/" className="text-sm text-muted-foreground hover:underline">
-          &larr; Back to intakes
-        </Link>
+      <div className="flex justify-end mb-6">
+        <a href={`/api/intakes/${intake.id}/export`} download>
+          <Button variant="outline" size="sm">
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+        </a>
       </div>
 ```
 
@@ -844,18 +855,18 @@ import { ApprovalBadge } from "@/components/approval-badge";
         </CardHeader>
 ```
 
-4. Remove the unused `Link` import if no longer used.
+4. Remove the unused `Link` import (no longer needed). Keep `Button` and `Download` imports for the Export CSV button.
 
 - [ ] **Step 2: Verify detail page renders**
 
 Run: `npx next dev`, create or view an existing intake at `/intakes/[id]`
-Expected: Approval badge visible in card header. No back link. Sidebar provides navigation.
+Expected: Approval badge visible in card header. Export CSV button present. No back link. Sidebar provides navigation.
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add src/app/intakes/[id]/page.tsx
-git commit -m "feat: add ApprovalBadge to detail page, remove back link"
+git commit -m "feat: add ApprovalBadge to detail page, remove back link, preserve CSV export"
 ```
 
 ---
@@ -883,7 +894,9 @@ Run: `npx next dev` and test:
 6. Clicking again clears the filter
 7. Clicking an intake card navigates to detail page
 8. Detail page shows approval badge, no back link
-9. Sidebar navigation works from detail page back to list
+9. Detail page "Export CSV" button still works (downloads single intake CSV)
+10. Home page "Export CSV" button still works (downloads bulk CSV)
+11. Sidebar navigation works from detail page back to list
 
 - [ ] **Step 4: Final commit if any fixes needed**
 

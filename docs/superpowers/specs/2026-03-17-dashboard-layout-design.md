@@ -75,7 +75,7 @@ Install the shadcn/ui sidebar component (`npx shadcn@latest add sidebar`) and bu
 
 - Title: "My Intakes"
 - Subtitle: "Your submitted project requests"
-- Action button: "+ New Intake" (links to `/intakes/new`)
+- Action buttons (right-aligned): "Export CSV" (outline, links to `/api/intakes/export`) and "+ New Intake" (primary, links to `/intakes/new`)
 
 ### Summary Cards (`IntakeSummaryCards`)
 
@@ -128,7 +128,7 @@ Lean card layout:
 
 ## Intake Detail Page (`/intakes/[id]`)
 
-Add the `ApprovalBadge` to the existing detail page header alongside the title. The "Back to intakes" link is removed — the sidebar provides persistent navigation.
+Add the `ApprovalBadge` to the existing detail page header alongside the title. The "Back to intakes" link is removed — the sidebar provides persistent navigation. Preserve the existing "Export CSV" button (single-intake export via `/api/intakes/[id]/export`) — move it into the card header area next to the approval badge.
 
 ## Component Architecture
 
