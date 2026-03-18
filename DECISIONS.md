@@ -1,33 +1,46 @@
 # Decisions
+Dictated but cleaned up with AI.
 
-Key decisions made during the Intake Triage Tool coding exercise.
+## Plan
 
----
-## Initial Application Design
-- **Next.js App Router + TypeScript** — Full-stack in one project with type safety across frontend and API routes.
-- **SQLite via Prisma** — Zero-infrastructure database, good fit for a local exercise.
-- **Flat JSON strings for AI arrays** — Tags and risk items stored as JSON strings in one table instead of separate join tables. Keeps the schema simple.
-- **Fire-and-forget AI + polling** — POST returns immediately, client polls every 2s for AI results. Simpler than WebSockets for this scope.
-- **Structured output with Zod** — Anthropic SDK structured output guarantees typed JSON from Claude, no manual parsing needed.
-- **Claude Sonnet** — Fast and cost-effective for the triage task.
-- **shadcn/ui + Tailwind** — Accessible components with utility-class styling for rapid UI development.
-- **No auth, no edit/delete, no tests** — Kept scope tight for the exercise. Tests are a stretch goal.
+- Next.js full-stack app, SQLite for zero-infra setup, Claude for AI triage
+- Core flow: create intake → list on dashboard → detail page with AI results
+- Stretch: CSV export, dashboard filtering, polished submitter view
 
-## CSV Feature
-- **Server-side CSV generation** — CSV is built on the server in API route handlers, not in the browser. Avoids shipping CSV logic to the client and keeps export behavior consistent.
-- **Hand-rolled CSV utilities instead of a library** — `escapeCSVField`, `parseJSONArray`, and `intakesToCSV` in `src/lib/csv.ts`. The format is simple enough that a dependency wasn't warranted; unit tests cover escaping edge cases.
-- **JSON array columns flattened to comma-separated strings** — AI tags and risk checklist items (stored as JSON strings in SQLite) are parsed and joined so each intake stays on one CSV row.
-- **Two export endpoints** — Bulk (`/api/intakes/export`) exports all completed intakes; single (`/api/intakes/[id]/export`) exports one intake with a slugified title in the filename.
-- **Bulk export filters to completed intakes only** — Intakes still pending AI triage are excluded so the export reflects finalized data.
-- **Export triggered via buttons on list and detail pages** — Simple anchor-style download; no client-side fetch or blob handling needed since the browser handles the `Content-Disposition: attachment` header natively.
+## Key Decisions
 
-## Adopting TweakCN Color Theme and Dashboard Layout Design
+- Went with Next.js App Router + TypeScript — one project, one deploy, type safety end to end.
+- SQLite via Prisma — no database server to set up. Prisma makes it easy to swap to Postgres later if needed.
+- Fire-and-forget AI — the POST comes back immediately, then the client polls every 2s. Way simpler than WebSockets for a single-user app. 60s timeout so it doesn't poll forever.
+- Structured output with Zod — this was the big win. Anthropic's SDK lets you pass a Zod schema and you get typed JSON back. No parsing, no retries on malformed output. Just works.
+- Two separate status columns — `aiStatus` tracks whether Claude has finished, `approvalStatus` tracks the business decision. Kept them independent so they don't step on each other.
+- Server-side CSV — built in the API route, browser downloads it natively. No client-side blob handling.
+- Hand-rolled CSV utils — simple enough that a library wasn't worth it. Wrote tests for the escaping edge cases instead.
+- shadcn/ui + Tailwind — fast way to get a polished UI without fighting CSS.
 
-## Dashboard Layout — Submitter View
-- **Navigation-focused shell with collapsible sidebar** — Adds persistent navigation (My Intakes, New Intake, Settings placeholder) to prepare for multiple user views without implementing user management yet.
-- **This is the project submitter's read-only surface** — The submitter can view their intakes and see approval status (Submitted, Approved, Denied) but cannot change it. Approval status changes will come from the analyst view (future work). The summary cards and badges are informational only, not actionable.
-- **Two-track status model** — `aiStatus` (pending/completed/error) tracks the AI triage pipeline; `approvalStatus` (submitted/approved/denied) tracks the business decision. These are deliberately separate concerns. The submitter sees approval status prominently and AI status as a secondary indicator.
-- **Summary cards double as filters** — The four status cards (Total, Submitted, Approved, Denied) show counts and act as click-to-filter controls. Client-side filtering on a single fetch — no extra API calls. Sufficient at current scale.
-- **Sidebar dark theme via CSS variables** — Sidebar colors are set to dark values directly in `:root` rather than using a `.dark` class wrapper. This avoids issues with Tailwind's `@custom-variant dark` selector which only targets descendants, not the element itself.
-- **No user management or route splitting yet** — Both views (submitter, analyst) will share the same routes for now. Route groups can be introduced when the analyst view is designed and user types are implemented.
-- **`approvalStatus` defaults to "submitted"** — Server-set, never user-submitted. Not added to `createIntakeSchema`. Only an analyst will be able to change this value (future feature).
+## How I Verified
+
+- 8 Vitest test files covering CSV utils, validation schemas, AI generation (mocked), dashboard logic, and all API endpoints.
+- Manually walked through the full flow — created intakes, watched the AI triage populate, exported CSVs, tested error states with a bad API key.
+
+## Tradeoffs
+
+- No auth — single-user exercise, didn't want to burn time on login flows.
+- No edit/delete — create + read was the core ask. CRUD is straightforward to add.
+- No WebSockets — polling works fine at this scale. Would switch for multi-user.
+- No analyst view — the approval model is there (submitted/approved/denied) but only the submitter view exists. Analyst approval UI is the obvious next feature.
+- No pagination — fetching everything and filtering client-side. Fine for dozens of intakes.
+
+## What I Learned
+
+- Structured output with Zod eliminated an entire class of bugs. Using this pattern everywhere going forward.
+- Fire-and-forget + skeleton loaders is a surprisingly good UX. The content just appears.
+- Defining the Prisma schema and Zod schemas first made everything downstream click into place fast.
+
+## If I Had 1 More Day
+
+- Analyst view with approve/deny actions and bulk operations
+- Edit and resubmit — update an intake and re-trigger AI triage
+- Replace polling with SSE for real-time updates
+- Server-side search and pagination
+- Playwright E2E tests for the full flow
