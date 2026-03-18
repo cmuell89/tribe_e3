@@ -2,212 +2,132 @@
 
 ## Overview
 
-A small internal tool that helps triage inbound project requests quickly and consistently. Built as a thin horizontal slice covering frontend, backend API, persistence, AI analysis, UX states, and reproducibility (Docker).
+A small internal tool that helps triage inbound project requests quickly and consistently. Users create intake requests via a form, and an AI assistant automatically generates a triage analysis (summary, tags, risk checklist, value proposition).
 
-**Stack:** Next.js App Router + Prisma + SQLite + Anthropic Claude (structured output) + TypeScript + Tailwind CSS
+## Stack
 
-**Architecture:** Server Actions with inline AI — intake creation persists to SQLite, calls Claude for structured analysis, and stores results in a single round-trip.
+- **Framework:** Next.js App Router (TypeScript)
+- **Database:** SQLite via Prisma
+- **Styling:** shadcn/ui + Tailwind CSS
+- **AI:** Claude Sonnet via Anthropic SDK (`@anthropic-ai/sdk`)
+- **Async pattern:** Fire-and-forget in POST route handler, client-side polling
 
 ## Data Model
 
-Single `Intake` table in SQLite via Prisma:
+Single `Intake` table:
 
-```
-Intake
-├── id                  String   @id @default(cuid())
-├── title               String
-├── description         String
-├── budgetRange         String
-├── timeline            String
-├── industry            String
-├── createdAt           DateTime @default(now())
-│
-│ — AI-generated fields (nullable until populated) —
-├── summary             String?       // 2-3 sentence summary
-├── tags                String?       // JSON array: ["tag1","tag2","tag3"]
-├── riskChecklist       String?       // JSON array of bullet strings
-├── valuePropositions   String?       // JSON array of 3 value props
-├── aiStatus            String   @default("pending")  // "pending" | "completed" | "failed"
-├── aiError             String?       // error message if AI call failed
-```
+| Field              | Type     | Notes                                                        |
+| ------------------ | -------- | ------------------------------------------------------------ |
+| `id`               | String   | Primary key (cuid)                                           |
+| `title`            | String   | Required                                                     |
+| `description`      | String   | Required                                                     |
+| `budgetRange`      | String   | e.g. "$10k-$50k"                                             |
+| `timeline`         | String   | e.g. "Q2 2026"                                               |
+| `industry`         | String   | e.g. "Healthcare"                                            |
+| `createdAt`        | DateTime | Auto-set                                                     |
+| `aiStatus`         | String   | `pending` \| `completed` \| `error`                          |
+| `aiSummary`        | String?  | 2-3 sentence summary                                         |
+| `aiTags`           | String?  | JSON-serialized string array (3 tags)                        |
+| `aiRiskChecklist`  | String?  | JSON-serialized string array (3-5 risk items)                |
+| `aiValueProposition` | String? | 2-3 sentences on value relative to budget/timeline/industry |
+| `aiError`          | String?  | Error message if AI processing fails                         |
 
-JSON arrays stored as strings (Prisma doesn't support native JSON on SQLite). Parsed/serialized in the application layer.
+`aiTags` and `aiRiskChecklist` are stored as JSON strings to keep the schema flat (no join tables).
 
-`aiStatus` enables the UI to distinguish between pending, completed, and failed AI states.
+## API Routes
 
-## Project Structure
+| Method | Path                | Purpose                                          |
+| ------ | ------------------- | ------------------------------------------------ |
+| `GET`  | `/api/intakes`      | List all intakes, sorted by `createdAt` desc     |
+| `GET`  | `/api/intakes/[id]` | Get single intake (used for polling AI status)   |
+| `POST` | `/api/intakes`      | Create intake, fire-and-forget AI processing     |
 
-```
-tribe_e3/
-├── prisma/
-│   └── schema.prisma
-├── src/
-│   ├── app/
-│   │   ├── layout.tsx              # Root layout
-│   │   ├── page.tsx                # Intake list view (home)
-│   │   ├── intakes/
-│   │   │   ├── new/
-│   │   │   │   └── page.tsx        # Create intake form
-│   │   │   └── [id]/
-│   │   │       └── page.tsx        # Intake detail view
-│   │   ├── dashboard/
-│   │   │   └── page.tsx            # Dashboard (counts by tag/status)
-│   │   └── api/
-│   │       └── intakes/
-│   │           ├── route.ts        # GET /api/intakes (list + CSV export)
-│   │           └── [id]/
-│   │               └── route.ts    # GET /api/intakes/:id
-│   ├── actions/
-│   │   └── intakes.ts              # Server Actions: createIntake, retryAi
-│   ├── lib/
-│   │   ├── prisma.ts               # Prisma client singleton
-│   │   ├── ai.ts                   # Claude API call + retry logic
-│   │   └── ai-schema.ts           # Zod schema for AI JSON response
-│   ├── components/
-│   │   ├── intake-form.tsx         # Create form (client component)
-│   │   ├── intake-list.tsx         # List with empty/loading/error states
-│   │   ├── intake-detail.tsx       # Detail view with AI results
-│   │   ├── ai-results.tsx          # Summary, tags, risk, value props display
-│   │   ├── dashboard-charts.tsx    # Tag/status counts
-│   │   ├── loading-skeleton.tsx    # Reusable loading skeleton
-│   │   └── error-boundary.tsx      # Error UI component
-│   └── types/
-│       └── intake.ts               # Shared TypeScript types
-├── __tests__/
-│   ├── actions/
-│   │   └── intakes.test.ts         # Server action tests
-│   ├── lib/
-│   │   └── ai.test.ts              # AI call tests (mocked)
-│   └── components/
-│       └── intake-form.test.tsx    # Form component tests
-├── Dockerfile
-├── docker-compose.yml
-├── package.json
-├── tsconfig.json
-├── next.config.ts
-└── .env.local                      # ANTHROPIC_API_KEY
-```
+### POST `/api/intakes` Flow
 
-**Key decisions:**
-- Server Actions in `src/actions/` (not inline in pages) for testability and reuse
-- Route Handlers only for read operations (list/CSV export, detail). Writes go through Server Actions.
-- AI logic isolated in `src/lib/` — schema and API call are separate for independent testing
-- Tests in `__tests__/` mirroring src structure
+1. Validate required fields (title, description)
+2. Create intake in DB with `aiStatus: "pending"`
+3. Return the intake immediately (201 Created)
+4. In a detached async function (no `await`):
+   - Call Claude API with intake fields
+   - Parse structured JSON response
+   - Update DB with AI fields + `aiStatus: "completed"`
+   - On failure after retries: set `aiStatus: "error"` + store error in `aiError`
+
+## Frontend Pages
+
+| Route            | Page          | Description                                                            |
+| ---------------- | ------------- | ---------------------------------------------------------------------- |
+| `/`              | Intake List   | Cards for all intakes, sorted newest first. Empty state when none.     |
+| `/intakes/new`   | Create Intake | Form with all intake fields. Redirects to detail page on submit.       |
+| `/intakes/[id]`  | Intake Detail | Shows intake fields + AI triage panel. Polls until AI status resolves. |
+
+### Key Components
+
+- **IntakeCard** — list view card showing title, industry, created date, AI status badge
+- **IntakeForm** — creation form with validation and loading state on submit button
+- **AiTriagePanel** — AI results section on detail page with three states:
+  - *Pending:* skeleton/spinner with "Generating triage..."
+  - *Completed:* summary, tags as badges, risk checklist as bullets, value proposition
+  - *Error:* error message with explanation
+
+### UX States
+
+- **Loading:** submit button spinner during form submission; skeleton loader on AI triage panel while pending
+- **Empty:** list page shows "No intakes yet — create your first one" when no intakes exist
+- **Error:** AI failure displayed in detail view triage panel; form validation errors inline; API errors shown as banner/toast
 
 ## AI Integration
 
-### Structured Output
+### Prompt
 
-Single call to Claude on intake creation. Anthropic SDK tool_use with a JSON schema for reliable structured output.
+```
+System: You are a project intake triage assistant. Analyze the project request and return JSON.
 
-**Zod schema:**
+User: Analyze this project intake:
+- Title: {title}
+- Description: {description}
+- Budget: {budgetRange}
+- Timeline: {timeline}
+- Industry: {industry}
 
-```typescript
-{
-  summary: string,            // 2-3 sentences
-  tags: string[],             // exactly 3
-  riskChecklist: string[],    // 3-6 bullet items
-  valuePropositions: string[] // exactly 3
-}
+Return JSON with:
+- summary (2-3 sentences)
+- tags (array of exactly 3 strings)
+- riskChecklist (array of 3-5 risk items as strings)
+- valueProposition (2-3 sentences evaluating the value relative to budget, timeline, and industry context)
 ```
 
-### Prompt Design
+### Model
 
-- **System prompt:** Act as a project triage analyst
-- **User message:** Includes title, description, budget range, timeline, and industry
-- Value propositions are tailored using the industry, description, budget, and timeline context
+Claude Sonnet — fast, cost-effective, capable of structured output.
 
-### Reliability
+### Retry Logic
 
-- **3 retries** with exponential backoff on transient failures (rate limits, network errors)
-- **Zod validation** on every response — malformed responses trigger a retry
-- **Fallback on exhaustion:** Mark `aiStatus: "failed"`, store error in `aiError`. UI shows error state with "Retry" button calling `retryAi` server action.
-- **Timeout:** 30s per attempt
-- **Guardrails:** Max token limit on response; truncate oversized description input before sending
+3 attempts with exponential backoff:
 
-## Frontend & UX States
+- Attempt 1: immediate
+- Attempt 2: wait 1 second
+- Attempt 3: wait 3 seconds
 
-### Intake List (home page `/`)
+Retries on:
+- Network errors / timeouts
+- Claude API 5xx errors
+- JSON parse failures
 
-- Table/card list showing title, industry, tags, aiStatus, createdAt
-- **Loading:** Skeleton rows while server component fetches
-- **Empty:** Friendly message + prominent "Create your first intake" CTA
-- **Error:** Error boundary catches fetch failures, shows message + retry
+After 3 failures: set `aiStatus: "error"`, store last error message in `aiError`.
 
-### Create Intake (`/intakes/new`)
+## Polling Mechanism
 
-- Form fields: title, description, budget range, timeline, industry
-- Client-side validation (required fields) before submission
-- Submit calls `createIntake` server action
-- **Loading:** Button shows spinner + "Creating & analyzing..." (~2-5s during AI call — natural, genuine loading state)
-- **Error:** If AI fails, still redirects to detail page — intake is persisted, AI section shows failed state with retry option
+Client-side polling on the detail page:
 
-### Intake Detail (`/intakes/[id]`)
+- Poll `GET /api/intakes/[id]` every **2 seconds** when `aiStatus` is `"pending"`
+- Stop polling when `aiStatus` is `"completed"` or `"error"`
+- Cap at **30 polls (60 seconds)** — show timeout message if still pending
+- Implemented via `useEffect` + `setInterval`, with cleanup on unmount
 
-- All intake fields + AI results in distinct cards:
-  - Summary (text block)
-  - Tags (pill badges)
-  - Risk checklist (bullet list)
-  - Value propositions (numbered list)
-- **AI failed state:** Alert banner + "Retry AI Analysis" button
-- **AI pending state:** Loading skeleton (handled gracefully as fallback)
-- **Error:** 404 page if intake not found
+## Out of Scope
 
-### Dashboard (`/dashboard`)
-
-- Counts by tag
-- Counts by aiStatus (completed/failed/pending)
-- CSV export button — hits `GET /api/intakes?format=csv`
-
-### Navigation
-
-Simple top nav: Home (list), Dashboard. Create button prominent on list page.
-
-### Styling
-
-Tailwind CSS — clean, functional. Focused on clarity and empathy over visual polish.
-
-## Testing Strategy
-
-**Tooling:** Vitest + React Testing Library
-
-### Unit tests (`src/lib/`)
-
-- `ai.test.ts` — Mock Anthropic SDK. Test: structured output parsing via Zod, retries on transient errors, fallback to failed status after exhausting retries, oversized input truncation
-- Zod schema validation with edge cases (missing fields, wrong types, extra fields)
-
-### Server Action tests (`src/actions/`)
-
-- `intakes.test.ts` — Mock Prisma and AI module. Test: `createIntake` persists intake + AI results on success, persists with `aiStatus: "failed"` on AI failure, `retryAi` updates existing intake, validation rejects incomplete form data
-
-### Component tests (`src/components/`)
-
-- `intake-form.test.tsx` — Form validation, submission behavior, loading state during submit
-
-## Docker
-
-### Dockerfile
-
-Multi-stage build:
-1. **deps stage** — install node_modules
-2. **build stage** — `prisma generate` + `next build`
-3. **run stage** — minimal image with standalone Next.js output, SQLite on a mounted volume
-
-### docker-compose.yml
-
-```yaml
-services:
-  app:
-    build: .
-    ports:
-      - "3000:3000"
-    environment:
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - DATABASE_URL=file:/data/dev.db
-    volumes:
-      - db-data:/data
-volumes:
-  db-data:
-```
-
-`next.config.ts` sets `output: "standalone"` for minimal production build.
+- Edit / delete intakes
+- Authentication
+- Deployment / Docker
+- Tests (bonus if time allows)
