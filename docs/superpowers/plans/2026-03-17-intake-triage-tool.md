@@ -90,7 +90,7 @@ Expected: Server starts on `http://localhost:3000`, default Next.js page renders
 - [ ] **Step 5: Commit**
 
 ```bash
-git add -A
+git add package.json package-lock.json tsconfig.json next.config.ts tailwind.config.ts postcss.config.mjs src/ components.json .gitignore public/ next-env.d.ts eslint.config.mjs
 git commit -m "feat: scaffold Next.js project with shadcn/ui and Tailwind"
 ```
 
@@ -188,7 +188,7 @@ Expected: Opens browser with Intake table visible (empty).
 - [ ] **Step 7: Commit**
 
 ```bash
-git add -A
+git add prisma/ src/lib/db.ts package.json package-lock.json
 git commit -m "feat: add Prisma with SQLite and Intake model"
 ```
 
