@@ -25,7 +25,7 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <Sidebar className="dark">
+    <Sidebar>
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground text-sm font-bold">
