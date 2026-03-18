@@ -7,6 +7,7 @@ out/
 
 # build
 dist/
+*.tsbuildinfo
 
 # env files
 .env
@@ -30,3 +31,9 @@ prisma/*.db-journal
 Thumbs.db
 
 /src/generated/prisma
+
+# brainstorming
+.superpowers/
+
+# worktrees
+.worktrees/
