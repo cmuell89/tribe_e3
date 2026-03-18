@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { IntakeSummaryCards } from "@/components/intake-summary-cards";
 import { IntakeCard } from "@/components/intake-card";
@@ -19,8 +19,45 @@ interface ClientDashboardProps {
   intakes: IntakeData[];
 }
 
-export function ClientDashboard({ intakes }: ClientDashboardProps) {
+export function ClientDashboard({ intakes: initialIntakes }: ClientDashboardProps) {
+  const [intakes, setIntakes] = useState(initialIntakes);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+
+  const hasPending = useMemo(
+    () => intakes.some((i) => i.aiStatus === "pending"),
+    [intakes]
+  );
+
+  const refreshIntakes = useCallback(async () => {
+    try {
+      const res = await fetch("/api/intakes");
+      if (!res.ok) return;
+      const data = await res.json();
+      setIntakes(
+        data.map((intake: Record<string, unknown>) => ({
+          id: intake.id as string,
+          title: intake.title as string,
+          industry: intake.industry as string,
+          createdAt: intake.createdAt as string,
+          aiStatus: intake.aiStatus as string,
+          approvalStatus: intake.approvalStatus as string,
+        }))
+      );
+    } catch {
+      // Silently retry on next interval
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasPending) return;
+    const interval = setInterval(refreshIntakes, 3000);
+    return () => clearInterval(interval);
+  }, [hasPending, refreshIntakes]);
+
+  // Sync with server-provided props when they change (e.g. navigation)
+  useEffect(() => {
+    setIntakes(initialIntakes);
+  }, [initialIntakes]);
 
   const counts = useMemo(() => computeApprovalCounts(intakes), [intakes]);
 
