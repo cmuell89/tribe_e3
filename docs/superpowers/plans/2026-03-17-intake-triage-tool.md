@@ -39,6 +39,12 @@ src/
     └── schemas.ts              # Zod schemas (form validation + AI output)
 prisma/
 └── schema.prisma               # Intake model
+__tests__/
+├── schemas.test.ts             # Schema validation tests
+├── ai.test.ts                  # AI retry logic tests (mocked SDK)
+└── api/
+    ├── intakes.test.ts         # List + create API tests
+    └── intakes-id.test.ts      # Single intake API tests
 ```
 
 ---
@@ -194,10 +200,81 @@ git commit -m "feat: add Prisma with SQLite and Intake model"
 
 ---
 
-### Task 3: Zod Schemas
+### Task 3: Test Infrastructure Setup
 
 **Files:**
-- Create: `src/lib/schemas.ts`
+- Create: `vitest.config.ts`, `__tests__/setup.ts`
+- Modify: `package.json` (add vitest, test script)
+
+- [ ] **Step 1: Install Vitest and testing utilities**
+
+Run:
+```bash
+npm install -D vitest @vitejs/plugin-react
+```
+
+- [ ] **Step 2: Create Vitest config**
+
+Write `vitest.config.ts`:
+
+```typescript
+import { defineConfig } from "vitest/config";
+import path from "path";
+
+export default defineConfig({
+  test: {
+    globals: true,
+    environment: "node",
+    setupFiles: ["./__tests__/setup.ts"],
+    include: ["__tests__/**/*.test.ts"],
+  },
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
+});
+```
+
+- [ ] **Step 3: Create test setup file**
+
+Write `__tests__/setup.ts`:
+
+```typescript
+// Global test setup
+// Add any shared test utilities or mocks here
+```
+
+- [ ] **Step 4: Add test script to package.json**
+
+Add to `package.json` scripts:
+```json
+"test": "vitest run",
+"test:watch": "vitest"
+```
+
+- [ ] **Step 5: Verify Vitest runs (no tests yet)**
+
+Run:
+```bash
+npm test
+```
+
+Expected: Vitest runs successfully with "No test files found" or similar.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add vitest.config.ts __tests__/setup.ts package.json package-lock.json
+git commit -m "feat: add Vitest test infrastructure"
+```
+
+---
+
+### Task 4: Zod Schemas (TDD)
+
+**Files:**
+- Create: `src/lib/schemas.ts`, `__tests__/schemas.test.ts`
 - Modify: `package.json` (add zod)
 
 - [ ] **Step 1: Install Zod**
@@ -207,7 +284,124 @@ Run:
 npm install zod
 ```
 
-- [ ] **Step 2: Create shared schemas file**
+- [ ] **Step 2: Write failing tests for schemas**
+
+Write `__tests__/schemas.test.ts`:
+
+```typescript
+import { describe, it, expect } from "vitest";
+import { createIntakeSchema, triageOutputSchema } from "@/lib/schemas";
+
+describe("createIntakeSchema", () => {
+  it("accepts valid full input", () => {
+    const result = createIntakeSchema.safeParse({
+      title: "Test Project",
+      description: "A test project description",
+      budgetRange: "$10k-$50k",
+      timeline: "Q2 2026",
+      industry: "Healthcare",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts input with only required fields", () => {
+    const result = createIntakeSchema.safeParse({
+      title: "Test",
+      description: "Description",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.budgetRange).toBe("");
+      expect(result.data.timeline).toBe("");
+      expect(result.data.industry).toBe("");
+    }
+  });
+
+  it("rejects empty title", () => {
+    const result = createIntakeSchema.safeParse({
+      title: "",
+      description: "Valid description",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects empty description", () => {
+    const result = createIntakeSchema.safeParse({
+      title: "Valid title",
+      description: "",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects title over 200 characters", () => {
+    const result = createIntakeSchema.safeParse({
+      title: "a".repeat(201),
+      description: "Valid description",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects missing title", () => {
+    const result = createIntakeSchema.safeParse({
+      description: "Valid description",
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("triageOutputSchema", () => {
+  it("accepts valid triage output", () => {
+    const result = triageOutputSchema.safeParse({
+      summary: "This is a summary.",
+      tags: ["tag1", "tag2", "tag3"],
+      riskChecklist: ["risk1", "risk2", "risk3"],
+      valueProposition: "This project has strong value.",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects wrong number of tags", () => {
+    const result = triageOutputSchema.safeParse({
+      summary: "Summary.",
+      tags: ["tag1", "tag2"],
+      riskChecklist: ["risk1", "risk2", "risk3"],
+      valueProposition: "Value prop.",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects too few risk items", () => {
+    const result = triageOutputSchema.safeParse({
+      summary: "Summary.",
+      tags: ["tag1", "tag2", "tag3"],
+      riskChecklist: ["risk1", "risk2"],
+      valueProposition: "Value prop.",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects too many risk items", () => {
+    const result = triageOutputSchema.safeParse({
+      summary: "Summary.",
+      tags: ["tag1", "tag2", "tag3"],
+      riskChecklist: ["r1", "r2", "r3", "r4", "r5", "r6"],
+      valueProposition: "Value prop.",
+    });
+    expect(result.success).toBe(false);
+  });
+});
+```
+
+- [ ] **Step 3: Run tests to verify they fail**
+
+Run:
+```bash
+npm test
+```
+
+Expected: FAIL — `Cannot find module '@/lib/schemas'`
+
+- [ ] **Step 4: Implement schemas**
 
 Write `src/lib/schemas.ts`:
 
@@ -244,19 +438,28 @@ export const triageOutputSchema = z.object({
 export type TriageOutput = z.infer<typeof triageOutputSchema>;
 ```
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 5: Run tests to verify they pass**
+
+Run:
+```bash
+npm test
+```
+
+Expected: All schema tests PASS.
+
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/lib/schemas.ts package.json package-lock.json
-git commit -m "feat: add Zod schemas for intake validation and AI output"
+git add src/lib/schemas.ts __tests__/schemas.test.ts package.json package-lock.json
+git commit -m "feat: add Zod schemas for intake validation and AI output with tests"
 ```
 
 ---
 
-### Task 4: AI Integration (Claude Structured Output + Retry)
+### Task 5: AI Integration (TDD — Claude Structured Output + Retry)
 
 **Files:**
-- Create: `src/lib/ai.ts`
+- Create: `src/lib/ai.ts`, `__tests__/ai.test.ts`
 - Modify: `package.json` (add anthropic sdk)
 
 - [ ] **Step 1: Install Anthropic SDK**
@@ -266,7 +469,140 @@ Run:
 npm install @anthropic-ai/sdk
 ```
 
-- [ ] **Step 2: Create AI module with retry logic**
+- [ ] **Step 2: Write failing tests for AI retry logic**
+
+Write `__tests__/ai.test.ts`:
+
+```typescript
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// Mock the Anthropic SDK before importing ai.ts
+vi.mock("@anthropic-ai/sdk", () => {
+  const APIError = class extends Error {
+    status: number;
+    constructor(message: string, status: number) {
+      super(message);
+      this.status = status;
+      this.name = "APIError";
+    }
+  };
+
+  const mockParse = vi.fn();
+
+  return {
+    default: vi.fn().mockImplementation(() => ({
+      messages: { parse: mockParse },
+    })),
+    APIError,
+    __mockParse: mockParse,
+  };
+});
+
+vi.mock("@anthropic-ai/sdk/helpers/zod", () => ({
+  zodOutputFormat: vi.fn().mockReturnValue({ type: "json_schema" }),
+}));
+
+import { generateTriage } from "@/lib/ai";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const { __mockParse: mockParse, APIError } = await import("@anthropic-ai/sdk") as any;
+
+const validIntake = {
+  title: "Test Project",
+  description: "Test description",
+  budgetRange: "$10k",
+  timeline: "Q2 2026",
+  industry: "Tech",
+};
+
+const validResponse = {
+  parsed_output: {
+    summary: "A test summary.",
+    tags: ["tag1", "tag2", "tag3"],
+    riskChecklist: ["risk1", "risk2", "risk3"],
+    valueProposition: "Good value.",
+  },
+};
+
+describe("generateTriage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  it("returns parsed output on success", async () => {
+    mockParse.mockResolvedValueOnce(validResponse);
+    const result = await generateTriage(validIntake);
+    expect(result).toEqual(validResponse.parsed_output);
+    expect(mockParse).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries on 500 error and succeeds", async () => {
+    mockParse
+      .mockRejectedValueOnce(new APIError("Server error", 500))
+      .mockResolvedValueOnce(validResponse);
+
+    const promise = generateTriage(validIntake);
+    await vi.advanceTimersByTimeAsync(1000);
+    const result = await promise;
+
+    expect(result).toEqual(validResponse.parsed_output);
+    expect(mockParse).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries on 429 rate limit and succeeds", async () => {
+    mockParse
+      .mockRejectedValueOnce(new APIError("Rate limited", 429))
+      .mockResolvedValueOnce(validResponse);
+
+    const promise = generateTriage(validIntake);
+    await vi.advanceTimersByTimeAsync(1000);
+    const result = await promise;
+
+    expect(result).toEqual(validResponse.parsed_output);
+    expect(mockParse).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry on 400 client error", async () => {
+    mockParse.mockRejectedValueOnce(new APIError("Bad request", 400));
+
+    await expect(generateTriage(validIntake)).rejects.toThrow("Bad request");
+    expect(mockParse).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws after 3 failed retries", async () => {
+    mockParse
+      .mockRejectedValueOnce(new APIError("Error", 500))
+      .mockRejectedValueOnce(new APIError("Error", 500))
+      .mockRejectedValueOnce(new APIError("Error", 500));
+
+    const promise = generateTriage(validIntake);
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(3000);
+
+    await expect(promise).rejects.toThrow("Error");
+    expect(mockParse).toHaveBeenCalledTimes(3);
+  });
+
+  it("throws when parsed_output is null", async () => {
+    mockParse.mockResolvedValueOnce({ parsed_output: null });
+
+    await expect(generateTriage(validIntake)).rejects.toThrow(
+      "No parsed output returned from Claude"
+    );
+  });
+});
+```
+
+- [ ] **Step 3: Run tests to verify they fail**
+
+Run:
+```bash
+npm test
+```
+
+Expected: FAIL — `Cannot find module '@/lib/ai'`
+
+- [ ] **Step 4: Implement AI module with retry logic**
 
 Write `src/lib/ai.ts`:
 
@@ -349,21 +685,197 @@ export async function generateTriage(intake: IntakeFields): Promise<TriageOutput
 }
 ```
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 5: Run tests to verify they pass**
+
+Run:
+```bash
+npm test
+```
+
+Expected: All AI tests PASS.
+
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/lib/ai.ts package.json package-lock.json
-git commit -m "feat: add Claude AI integration with structured output and retry"
+git add src/lib/ai.ts __tests__/ai.test.ts package.json package-lock.json
+git commit -m "feat: add Claude AI integration with structured output, retry, and tests"
 ```
 
 ---
 
-### Task 5: API Route Handlers
+### Task 6: API Route Handlers (TDD)
 
 **Files:**
-- Create: `src/app/api/intakes/route.ts`, `src/app/api/intakes/[id]/route.ts`
+- Create: `src/app/api/intakes/route.ts`, `src/app/api/intakes/[id]/route.ts`, `__tests__/api/intakes.test.ts`, `__tests__/api/intakes-id.test.ts`
 
-- [ ] **Step 1: Create the list + create route handler**
+- [ ] **Step 1: Write failing tests for API routes**
+
+Write `__tests__/api/intakes.test.ts`:
+
+```typescript
+import { describe, it, expect, beforeEach, vi } from "vitest";
+
+// Mock dependencies
+vi.mock("@/lib/db", () => ({
+  prisma: {
+    intake: {
+      findMany: vi.fn(),
+      create: vi.fn(),
+    },
+  },
+}));
+
+vi.mock("@/lib/ai", () => ({
+  generateTriage: vi.fn(),
+}));
+
+import { GET, POST } from "@/app/api/intakes/route";
+import { prisma } from "@/lib/db";
+
+const mockFindMany = vi.mocked(prisma.intake.findMany);
+const mockCreate = vi.mocked(prisma.intake.create);
+
+describe("GET /api/intakes", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns all intakes sorted by createdAt desc", async () => {
+    const intakes = [
+      { id: "1", title: "First", createdAt: new Date() },
+      { id: "2", title: "Second", createdAt: new Date() },
+    ];
+    mockFindMany.mockResolvedValueOnce(intakes as never);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data).toHaveLength(2);
+    expect(mockFindMany).toHaveBeenCalledWith({
+      orderBy: { createdAt: "desc" },
+    });
+  });
+
+  it("returns empty array when no intakes exist", async () => {
+    mockFindMany.mockResolvedValueOnce([]);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(data).toEqual([]);
+  });
+});
+
+describe("POST /api/intakes", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("creates intake and returns 201", async () => {
+    const created = {
+      id: "abc123",
+      title: "Test",
+      description: "Desc",
+      budgetRange: "",
+      timeline: "",
+      industry: "",
+      aiStatus: "pending",
+      createdAt: new Date(),
+    };
+    mockCreate.mockResolvedValueOnce(created as never);
+
+    const request = new Request("http://localhost/api/intakes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "Test", description: "Desc" }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(201);
+
+    const data = await response.json();
+    expect(data.id).toBe("abc123");
+    expect(data.aiStatus).toBe("pending");
+  });
+
+  it("returns 400 for missing required fields", async () => {
+    const request = new Request("http://localhost/api/intakes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: "" }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+  });
+
+  it("returns 400 for invalid JSON", async () => {
+    const request = new Request("http://localhost/api/intakes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "not json",
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+  });
+});
+```
+
+Write `__tests__/api/intakes-id.test.ts`:
+
+```typescript
+import { describe, it, expect, beforeEach, vi } from "vitest";
+
+vi.mock("@/lib/db", () => ({
+  prisma: {
+    intake: {
+      findUnique: vi.fn(),
+    },
+  },
+}));
+
+import { GET } from "@/app/api/intakes/[id]/route";
+import { prisma } from "@/lib/db";
+
+const mockFindUnique = vi.mocked(prisma.intake.findUnique);
+
+describe("GET /api/intakes/[id]", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns intake when found", async () => {
+    const intake = { id: "abc123", title: "Test", aiStatus: "completed" };
+    mockFindUnique.mockResolvedValueOnce(intake as never);
+
+    const request = new Request("http://localhost/api/intakes/abc123");
+    const response = await GET(request, {
+      params: Promise.resolve({ id: "abc123" }),
+    });
+    const data = await response.json();
+
+    expect(data.id).toBe("abc123");
+    expect(mockFindUnique).toHaveBeenCalledWith({ where: { id: "abc123" } });
+  });
+
+  it("returns 404 when intake not found", async () => {
+    mockFindUnique.mockResolvedValueOnce(null);
+
+    const request = new Request("http://localhost/api/intakes/nonexistent");
+    const response = await GET(request, {
+      params: Promise.resolve({ id: "nonexistent" }),
+    });
+
+    expect(response.status).toBe(404);
+  });
+});
+```
+
+- [ ] **Step 2: Run tests to verify they fail**
+
+Run:
+```bash
+npm test
+```
+
+Expected: FAIL — `Cannot find module '@/app/api/intakes/route'`
+
+- [ ] **Step 3: Create the list + create route handler**
 
 Write `src/app/api/intakes/route.ts`:
 
@@ -473,7 +985,16 @@ export async function GET(
 }
 ```
 
-- [ ] **Step 3: Test API with curl**
+- [ ] **Step 5: Run tests to verify they pass**
+
+Run:
+```bash
+npm test
+```
+
+Expected: All API route tests PASS.
+
+- [ ] **Step 6: Test API with curl (manual integration test)**
 
 Start dev server, then in another terminal:
 
@@ -492,16 +1013,16 @@ curl http://localhost:3000/api/intakes/<id>
 
 Expected: Intake created with `aiStatus: "pending"`, then after a few seconds polling the single endpoint shows `aiStatus: "completed"` with AI fields populated.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add src/app/api/
-git commit -m "feat: add API route handlers for intake list, create, and get with async AI processing"
+git add src/app/api/ __tests__/api/
+git commit -m "feat: add API route handlers for intake list, create, and get with tests"
 ```
 
 ---
 
-### Task 6: Intake List Page (Empty + Populated States)
+### Task 7: Intake List Page (Empty + Populated States)
 
 **Files:**
 - Create: `src/components/intake-card.tsx`
@@ -625,7 +1146,7 @@ git commit -m "feat: add intake list page with empty state and intake card compo
 
 ---
 
-### Task 7: Create Intake Form
+### Task 8: Create Intake Form
 
 **Files:**
 - Create: `src/components/intake-form.tsx`, `src/app/intakes/new/page.tsx`
@@ -804,7 +1325,7 @@ git commit -m "feat: add create intake form with validation and loading state"
 
 ---
 
-### Task 8: Intake Detail Page with AI Triage Panel + Polling
+### Task 9: Intake Detail Page with AI Triage Panel + Polling
 
 **Files:**
 - Create: `src/components/ai-triage-panel.tsx`, `src/app/intakes/[id]/page.tsx`
@@ -1031,7 +1552,7 @@ git commit -m "feat: add intake detail page with AI triage panel and polling"
 
 ---
 
-### Task 9: Layout Polish and Root Layout
+### Task 10: Layout Polish and Root Layout
 
 **Files:**
 - Modify: `src/app/layout.tsx`
@@ -1085,7 +1606,7 @@ git commit -m "feat: update root layout with app title and clean styling"
 
 ---
 
-### Task 10: Error State Testing
+### Task 11: Error State Testing
 
 **Files:** No new files — testing only
 
